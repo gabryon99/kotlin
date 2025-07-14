@@ -49,6 +49,7 @@ data class LlvmPipelineConfig(
         val modulePasses: String? = null,
         val ltoPasses: String? = null,
         val sspMode: StackProtectorMode = StackProtectorMode.NO,
+        val hotReloadEnabled: Boolean = false
 )
 
 private fun getCpuModel(context: NativeBackendPhaseContext): String {
@@ -178,6 +179,7 @@ internal fun createLTOFinalPipelineConfig(
             modulePasses = config.llvmModulePasses,
             ltoPasses = config.llvmLTOPasses,
             sspMode = config.stackProtectorMode,
+            hotReloadEnabled = config.hotReloadEnabled
     )
 }
 
@@ -291,8 +293,10 @@ class MandatoryOptimizationPipeline(config: LlvmPipelineConfig, performanceManag
     }
 
     override fun executeCustomPreprocessing(config: LlvmPipelineConfig, module: LLVMModuleRef) {
-        if (config.makeDeclarationsHidden) {
-            makeVisibilityHiddenLikeLlvmInternalizePass(module)
+        if (config.hotReloadEnabled) {
+            module.setSymbolsVisibilityToDefault()
+        } else {
+            makeVisibilityLikeLlvmInternalizePass(module)
         }
     }
 }
@@ -309,7 +313,7 @@ class LTOOptimizationPipeline(config: LlvmPipelineConfig, performanceManager: Pe
     override val passes =
             if (config.ltoPasses != null) listOf(config.ltoPasses)
             else buildList {
-                if (config.internalize) {
+                if (!config.hotReloadEnabled && config.internalize) {
                     add("internalize")
                 }
 

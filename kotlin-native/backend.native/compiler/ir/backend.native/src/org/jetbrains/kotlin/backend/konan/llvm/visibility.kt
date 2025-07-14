@@ -12,7 +12,7 @@ import org.jetbrains.kotlin.utils.DFS
  * Applies hidden visibility to symbols similarly to LLVM's internalize pass:
  * it makes hidden the symbols that are made internal by internalize.
  */
-fun makeVisibilityHiddenLikeLlvmInternalizePass(module: LLVMModuleRef) {
+fun makeVisibilityLikeLlvmInternalizePass(module: LLVMModuleRef) {
     // Note: the implementation below generally follows InternalizePass::internalizeModule,
     // but omits some details for simplicity.
 
@@ -30,6 +30,17 @@ fun makeVisibilityHiddenLikeLlvmInternalizePass(module: LLVMModuleRef) {
             .minus(alwaysPreserved)
             .forEach {
                 LLVMSetVisibility(it, LLVMVisibility.LLVMHiddenVisibility)
+            }
+}
+
+fun LLVMModuleRef.setSymbolsVisibilityToDefault() {
+    val alwaysPreserved = getLlvmUsed(this)
+    val symbols = getFunctions(this) + getGlobals(this) + getGlobalAliases(this)
+    symbols
+            .filter { LLVMIsDeclaration(it) == 0 }
+            .minus(alwaysPreserved)
+            .forEach {
+                LLVMSetVisibility(it, LLVMVisibility.LLVMDefaultVisibility)
             }
 }
 
