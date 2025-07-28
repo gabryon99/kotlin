@@ -134,6 +134,13 @@ fun CompilerConfiguration.setupFromArguments(arguments: K2NativeCompilerArgument
         putIfNotNull(BinaryOptions.memoryModel, memoryModelFromArgument)
     }
 
+    get(BinaryOptions.hotReload)?.also {
+        val debug = getBoolean(KonanConfigKeys.DEBUG)
+        if (it && !debug) {
+            report(ERROR, "hot-code reloading cannot work without debug info. Please compile with debug info enabled (i.e., `-g`.)")
+        }
+    }
+
     get(BinaryOptions.memoryModel)?.also {
         if (it != MemoryModel.EXPERIMENTAL) {
             report(ERROR, "Legacy MM is deprecated and no longer works.")
