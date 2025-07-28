@@ -7,10 +7,13 @@ package org.jetbrains.kotlin.backend.konan
 
 import kotlinx.cinterop.*
 import llvm.*
-import org.jetbrains.kotlin.config.LoggingContext
 import org.jetbrains.kotlin.backend.common.reportCompilationWarning
 import org.jetbrains.kotlin.backend.konan.driver.PhaseContext
-import org.jetbrains.kotlin.backend.konan.llvm.*
+import org.jetbrains.kotlin.backend.konan.llvm.LlvmFunctionAttribute
+import org.jetbrains.kotlin.backend.konan.llvm.addLlvmFunctionEnumAttribute
+import org.jetbrains.kotlin.backend.konan.llvm.getFunctions
+import org.jetbrains.kotlin.backend.konan.llvm.makeVisibilityLikeLlvmInternalizePass
+import org.jetbrains.kotlin.config.LoggingContext
 import org.jetbrains.kotlin.konan.target.*
 import java.io.Closeable
 
@@ -47,6 +50,7 @@ data class LlvmPipelineConfig(
         val modulePasses: String? = null,
         val ltoPasses: String? = null,
         val sspMode: StackProtectorMode = StackProtectorMode.NO,
+        val hotReloadEnabled: Boolean = false
 )
 
 private fun getCpuModel(context: PhaseContext): String {
@@ -176,6 +180,7 @@ internal fun createLTOFinalPipelineConfig(
             modulePasses = config.llvmModulePasses,
             ltoPasses = config.llvmLTOPasses,
             sspMode = config.stackProtectorMode,
+            hotReloadEnabled = config.hotReloadEnabled
     )
 }
 
@@ -292,8 +297,12 @@ class MandatoryOptimizationPipeline(config: LlvmPipelineConfig, logger: LoggingC
     }
 
     override fun executeCustomPreprocessing(config: LlvmPipelineConfig, module: LLVMModuleRef) {
+        if (config.hotReloadEnabled) {
+            makeVisibilityLikeLlvmInternalizePass(module, LLVMVisibility.LLVMDefaultVisibility)
+            return
+        }
         if (config.makeDeclarationsHidden) {
-            makeVisibilityHiddenLikeLlvmInternalizePass(module)
+            makeVisibilityLikeLlvmInternalizePass(module, LLVMVisibility.LLVMHiddenVisibility)
         }
     }
 }
@@ -310,7 +319,7 @@ class LTOOptimizationPipeline(config: LlvmPipelineConfig, logger: LoggingContext
     override val passes =
             if (config.ltoPasses != null) listOf(config.ltoPasses)
             else buildList {
-                if (config.internalize) {
+                if (!config.hotReloadEnabled && config.internalize) {
                     add("internalize")
                 }
 

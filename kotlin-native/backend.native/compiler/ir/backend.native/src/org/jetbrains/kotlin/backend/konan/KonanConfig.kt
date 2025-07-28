@@ -73,6 +73,9 @@ class KonanConfig(val project: Project, val configuration: CompilerConfiguration
         }
         explicit ?: target.needSmallBinary()
     }
+
+    val hotReloadEnabled: Boolean = configuration.get(BinaryOptions.hotReload) == true
+
     val inlineForPerformance get() = !debug && !smallBinary
 
     val assertsEnabled = configuration.getBoolean(KonanConfigKeys.ENABLE_ASSERTIONS)

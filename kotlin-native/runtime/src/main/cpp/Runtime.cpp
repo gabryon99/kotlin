@@ -119,7 +119,9 @@ NO_INLINE RuntimeState* initRuntime() {
   // Register runtime deinit function at thread cleanup.
   konan::onThreadExit(Kotlin_deinitRuntimeCallback, runtimeState);
 
-  hot::HotReloader::Init();
+  if (compiler::hotReloadEnabled()) {
+    HotReloader::Init();
+  }
 
   return result;
 }
