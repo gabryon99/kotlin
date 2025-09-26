@@ -68,9 +68,7 @@ class KotlinClass {
 public:
     static constexpr auto kRootClassName = "";
 
-    static std::string classNameToTypeInfoName(const std::string& className) {
-        return "kclass:" + className;
-    }
+    static std::string classNameToTypeInfoName(const std::string& className) { return "kclass:" + className; }
 
     KotlinClass() {}
 
@@ -87,7 +85,6 @@ public:
     [[nodiscard]] const std::vector<KotlinFunction>& functions() const { return functions_; }
     [[nodiscard]] const std::vector<KotlinClass>& super() const { return super_; }
 
-
 private:
     std::string name_{};
     std::string fqn_{};
@@ -97,9 +94,7 @@ private:
 };
 
 class LightClassTable {
-
 public:
-
     explicit LightClassTable(const ir::Klib& klib) {
         const auto declarationIds = klib.getDeclarationIds();
         // 0000000000000638 T _kfun:#App(kotlin.Int;androidx.compose.runtime.Composer?;kotlin.Int){}
@@ -119,7 +114,8 @@ public:
             }
         }
 
-        classes_[""] = KotlinClass("", "", rootProperties, rootFunctions);
+        classes_[KotlinClass::kRootClassName] =
+                KotlinClass(KotlinClass::kRootClassName, KotlinClass::kRootClassName, rootProperties, rootFunctions);
 
         // TODO: visit parent classes :)
     }
@@ -187,7 +183,8 @@ public:
 private:
     std::map<std::string, KotlinClass> classes_;
 
-    static std::string combinePackageNameWithDeclNameAndTypeArgs(const std::string& packageName, const std::string& declName, bool isNullable, const std::vector<std::string>& args) {
+    static std::string combinePackageNameWithDeclNameAndTypeArgs(
+            const std::string& packageName, const std::string& declName, bool isNullable, const std::vector<std::string>& args) {
         std::string name{};
         name.reserve(packageName.size() + declName.size());
 
@@ -289,7 +286,9 @@ private:
         properties[propertyName] = convertTypeToString(klib, *type);
     }
 
-    void visitClass(const ir::Klib& klib, std::reference_wrapper<const org::jetbrains::kotlin::backend::common::serialization::proto::IrDeclaration>::type& declaration) {
+    void visitClass(
+            const ir::Klib& klib,
+            std::reference_wrapper<const org::jetbrains::kotlin::backend::common::serialization::proto::IrDeclaration>::type& declaration) {
         auto& irClass = declaration.ir_class();
         const std::string className = klib.getIrStringById(irClass.name())->get();
         std::string fqn = "." + className;
