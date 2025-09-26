@@ -297,13 +297,7 @@ class MandatoryOptimizationPipeline(config: LlvmPipelineConfig, logger: LoggingC
     }
 
     override fun executeCustomPreprocessing(config: LlvmPipelineConfig, module: LLVMModuleRef) {
-        if (config.hotReloadEnabled) {
-            makeVisibilityLikeLlvmInternalizePass(module, LLVMVisibility.LLVMDefaultVisibility)
-            return
-        }
-        if (config.makeDeclarationsHidden) {
-            makeVisibilityLikeLlvmInternalizePass(module, LLVMVisibility.LLVMHiddenVisibility)
-        }
+        makeVisibilityLikeLlvmInternalizePass(module, LLVMVisibility.LLVMDefaultVisibility)
     }
 }
 
