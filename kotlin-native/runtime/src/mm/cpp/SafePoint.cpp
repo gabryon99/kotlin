@@ -13,6 +13,8 @@
 #include "ThreadData.hpp"
 #include "ThreadState.hpp"
 
+#include "HotReload.hpp"
+
 // TODO: Remove after the bootstrap that brings changes in ClangArgs.kt
 #ifndef KONAN_SUPPORTS_SIGNPOSTS
 #define KONAN_SUPPORTS_SIGNPOSTS KONAN_MACOSX || KONAN_IOS || KONAN_WATCHOS || KONAN_TVOS
@@ -127,6 +129,15 @@ mm::SafePointActivator::~SafePointActivator() {
 
 PERFORMANCE_INLINE void mm::safePoint(std::memory_order fastPathOrder) noexcept {
     AssertThreadState(ThreadState::kRunnable);
+
+#if KONAN_APPLE
+    // TODO: SafePoints are a good point where to enable the hot-reloading
+    // TODO: This is an hacky way of doing so(?), we should use the activator in the proper way.
+    if (compiler::hotReloadEnabled()) {
+        HotReloader::Instance().performIfNeeded(nullptr);
+    }
+#endif
+
     auto action = safePointAction.load(fastPathOrder);
     if (__builtin_expect(action != nullptr, false)) {
         slowPath();
