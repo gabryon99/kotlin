@@ -68,6 +68,10 @@ class KotlinClass {
 public:
     static constexpr auto kRootClassName = "";
 
+    static std::string classNameToTypeInfoName(const std::string& className) {
+        return "kclass:" + className;
+    }
+
     KotlinClass() {}
 
     explicit KotlinClass(
@@ -95,6 +99,7 @@ private:
 class LightClassTable {
 
 public:
+
     explicit LightClassTable(const ir::Klib& klib) {
         const auto declarationIds = klib.getDeclarationIds();
         // 0000000000000638 T _kfun:#App(kotlin.Int;androidx.compose.runtime.Composer?;kotlin.Int){}
