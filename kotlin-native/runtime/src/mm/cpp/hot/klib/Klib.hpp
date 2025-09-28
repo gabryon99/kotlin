@@ -127,7 +127,7 @@ private:
         const auto fileCount = filesTable_.getCount();
         containedFiles_.reserve(fileCount);
 
-        for (auto i = 0; i < fileCount; i++) {
+        for (size_t i = 0; i < fileCount; i++) {
             if (const auto optionalFile = filesTable_.getElementAt(i)) {
                 const auto& file = optionalFile.value().get();
                 const auto fqName = convertToFqnName(file.fq_name(), file.fq_name_size());
