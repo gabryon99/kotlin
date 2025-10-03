@@ -29,6 +29,9 @@ enum class CompilerOutputKind {
     TEST_BUNDLE {
         override fun suffix(target: KonanTarget?): String = ".xctest"
     },
+    OBJECT {
+        override fun suffix(target: KonanTarget?) = ".o"
+    },
 
     DYNAMIC_CACHE {
         override fun suffix(target: KonanTarget?) = ".${target!!.family.dynamicSuffix}"

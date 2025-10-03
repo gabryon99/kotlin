@@ -35,6 +35,8 @@ private val softDeprecatedTargets = setOf(
 
 private const val DEPRECATION_LINK = "https://kotl.in/native-targets-tiers"
 
+private val systemTempDirectoryPath = System.getProperty("java.io.tmpdir")
+
 interface CompilationSpawner {
     fun spawn(configuration: CompilerConfiguration)
     fun spawn(arguments: List<String>, setupConfiguration: CompilerConfiguration.() -> Unit)
@@ -115,11 +117,43 @@ class KonanDriver(
 
         ensureModuleName(konanConfig)
 
+        // HACK: force the creation of cache to short-circuit its final output
+        if (outputKind == CompilerOutputKind.OBJECT) {
+            val tmpIcDir = File(systemTempDirectoryPath).child("objmode").apply {
+                mkdirs()
+            }
+            configuration.put(CommonConfigurationKeys.INCREMENTAL_COMPILATION, true)
+            configuration.put(KonanConfigKeys.INCREMENTAL_CACHE_DIR, tmpIcDir.absolutePath)
+            konanConfig = KonanConfig(project, configuration) // TODO: Just set freshly built caches.
+        }
+
         val cacheBuilder = CacheBuilder(konanConfig, compilationSpawner)
         if (cacheBuilder.needToBuild()) {
             cacheBuilder.build()
             konanConfig = KonanConfig(project, configuration) // TODO: Just set freshly built caches.
         }
+
+        // TODO: The compiled object file has been already compiled during the CacheBuilder.
+        // TODO: When feeding `-produce object`, we should compile an object file for each provided source
+        // TODO: basically, behaving like `clang -c`.
+        // TODO: When compiling in object mode, we do not need fully linkage.
+        // TODO: The question is, how do we find those binary files? Where are they contained?
+        // TODO: When generating the object file, we should not define functions from stdlib.
+
+        /***
+         * ```kotlin
+         * class Foo(val x: Int) {
+         *     fun copy(times: Int): List<Foo> = buildList { repeat(times) { Foo(x) } }
+         * }
+         * ```
+         *
+         * So, from the example above, we don't want to have the definition of buildList and repeat (or List functions)
+         * defined within the libraries, however they can be referenced.
+         *
+         * What we are trying to achieve is done by the CacheBuilder when building the static cache, but we would
+         * like to have it for provided input files, so we can speed up compilation time delaying the linking
+         * phase in a second moment.
+         */
 
         if (!konanConfig.produce.isHeaderCache) {
             konanConfig.cacheSupport.checkConsistency()
@@ -166,17 +200,15 @@ class KonanDriver(
                         """.trimIndent())
 
         // For the first stage, construct a temporary file name for an intermediate KLib.
-        val intermediateKLib = File(System.getProperty("java.io.tmpdir"), "${UUID.randomUUID()}.klib").also {
-            require(!it.exists) { "Collision writing intermediate KLib $it" }
-            it.deleteOnExit()
-        }
+        val intermediateKlib = createTemporaryKlib()
+
         compilationSpawner.spawn(emptyList()) {
             fun <T> copy(key: CompilerConfigurationKey<T>) = putIfNotNull(key, configuration.get(key))
             fun <T> copyNotNull(key: CompilerConfigurationKey<T>) = put(key, configuration.getNotNull(key))
             // For the first stage, use "-p library" produce mode.
             put(KonanConfigKeys.PRODUCE, CompilerOutputKind.LIBRARY)
             copy(KonanConfigKeys.TARGET)
-            put(KonanConfigKeys.OUTPUT, intermediateKLib.absolutePath)
+            put(KonanConfigKeys.OUTPUT, intermediateKlib.absolutePath)
             copyNotNull(CLIConfigurationKeys.CONTENT_ROOTS)
             copyNotNull(KonanConfigKeys.LIBRARY_FILES)
             copy(KonanConfigKeys.FRIEND_MODULES)
@@ -199,12 +231,17 @@ class KonanDriver(
         // Frontend version must not be passed to 2nd stage (same as Gradle plugin does when calling CLI compiler), since there are no sources anymore
         configuration.put(CommonConfigurationKeys.USE_FIR, false)
         // For the second stage, provide just compiled intermediate KLib as "-Xinclude=" param.
-        require(intermediateKLib.exists) { "Intermediate KLib $intermediateKLib must have been created by successful first compilation stage" }
+        require(intermediateKlib.exists) { "Intermediate KLib $intermediateKlib must have been created by successful first compilation stage" }
         // We need to remove this flag, as it would otherwise override header written previously.
         // Unfortunately, there is no way to remove the flag, so empty string is put instead
         configuration.get(KonanConfigKeys.EMIT_LAZY_OBJC_HEADER_FILE)?.let { configuration.put(KonanConfigKeys.EMIT_LAZY_OBJC_HEADER_FILE, "") }
         configuration.put(KonanConfigKeys.INCLUDED_LIBRARIES,
-                configuration.get(KonanConfigKeys.INCLUDED_LIBRARIES).orEmpty() + listOf(intermediateKLib.absolutePath))
+                configuration.get(KonanConfigKeys.INCLUDED_LIBRARIES).orEmpty() + listOf(intermediateKlib.absolutePath))
         compilationSpawner.spawn(configuration) // Need to spawn a new compilation to create fresh environment (without sources).
+    }
+
+    private fun createTemporaryKlib(): File = File(systemTempDirectoryPath, "${UUID.randomUUID()}.klib").also {
+        require(!it.exists) { "Collision writing intermediate KLib $it" }
+        it.deleteOnExit()
     }
 }

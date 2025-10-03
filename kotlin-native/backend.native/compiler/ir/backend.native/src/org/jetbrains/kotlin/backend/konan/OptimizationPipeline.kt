@@ -343,6 +343,7 @@ internal fun RelocationModeFlags.currentRelocationMode(context: PhaseContext): R
             LinkerOutputKind.DYNAMIC_LIBRARY -> dynamicLibraryRelocationMode
             LinkerOutputKind.STATIC_LIBRARY -> staticLibraryRelocationMode
             LinkerOutputKind.EXECUTABLE -> executableRelocationMode
+            LinkerOutputKind.NONE -> staticLibraryRelocationMode
         }
 
 private fun RelocationModeFlags.Mode.translateToLlvmRelocMode() = when (this) {

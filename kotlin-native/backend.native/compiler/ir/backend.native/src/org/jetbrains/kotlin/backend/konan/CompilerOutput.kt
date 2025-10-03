@@ -19,13 +19,13 @@ import java.io.File
  * Supposed to be true for a single LLVM module within final binary.
  */
 val KonanConfig.isFinalBinary: Boolean get() = when (this.produce) {
-    CompilerOutputKind.PROGRAM, CompilerOutputKind.DYNAMIC,
-    CompilerOutputKind.STATIC -> true
-    CompilerOutputKind.DYNAMIC_CACHE, CompilerOutputKind.STATIC_CACHE, CompilerOutputKind.HEADER_CACHE,
-    CompilerOutputKind.LIBRARY, CompilerOutputKind.BITCODE -> false
-    CompilerOutputKind.FRAMEWORK -> !omitFrameworkBinary
-    CompilerOutputKind.TEST_BUNDLE -> true
-}
+        CompilerOutputKind.PROGRAM, CompilerOutputKind.DYNAMIC, CompilerOutputKind.OBJECT,
+        CompilerOutputKind.STATIC -> true
+        CompilerOutputKind.DYNAMIC_CACHE, CompilerOutputKind.STATIC_CACHE, CompilerOutputKind.HEADER_CACHE,
+        CompilerOutputKind.LIBRARY, CompilerOutputKind.BITCODE -> false
+        CompilerOutputKind.FRAMEWORK -> !omitFrameworkBinary
+        CompilerOutputKind.TEST_BUNDLE -> true
+    }
 
 val CompilerOutputKind.isNativeLibrary: Boolean
     get() = this == CompilerOutputKind.DYNAMIC || this == CompilerOutputKind.STATIC

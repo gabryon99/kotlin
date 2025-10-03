@@ -28,7 +28,8 @@ typealias ExecutableFile = String
 enum class LinkerOutputKind {
     DYNAMIC_LIBRARY,
     STATIC_LIBRARY,
-    EXECUTABLE
+    EXECUTABLE,
+    NONE
 }
 
 // Here we take somewhat unexpected approach - we create the thin
@@ -160,6 +161,7 @@ class AndroidLinker(targetProperties: AndroidConfigurables)
                 LinkerOutputKind.EXECUTABLE -> +listOf("-fPIE", "-pie")
                 LinkerOutputKind.DYNAMIC_LIBRARY -> +listOf("-fPIC", "-shared")
                 LinkerOutputKind.STATIC_LIBRARY -> {}
+                LinkerOutputKind.NONE -> {}
             }
             +"-target"
             +clangTarget

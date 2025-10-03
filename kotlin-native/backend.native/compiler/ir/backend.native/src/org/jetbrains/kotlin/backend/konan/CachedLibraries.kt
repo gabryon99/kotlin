@@ -169,11 +169,18 @@ class CachedLibraries(
             staticFile.absolutePath in cacheBinaryPartDirContents -> Cache.Monolithic(target, Kind.STATIC, staticFile.absolutePath)
             headerFile.absolutePath in cacheBinaryPartDirContents -> Cache.Monolithic(target, Kind.HEADER, headerFile.absolutePath)
             else -> {
+                // HACK: this is a way to preserve the original filename
                 val libraryFileDirs = library.getFilesWithFqNames().map {
-                    child(CacheSupport.cacheFileId(it.fqName, it.filePath))
+                    it.filePath.File().name.removeSuffix(".kt") to child(CacheSupport.cacheFileId(it.fqName, it.filePath))
                 }
-                Cache.PerFile(target, Kind.STATIC, absolutePath, libraryFileDirs,
-                        complete = cacheDirContents.containsAll(libraryFileDirs.map { it.absolutePath }))
+                libraryFileDirs.forEach { (originalFilePath, cachedPath) ->
+                    File(cachedPath.toString()).child("source").apply {
+                        createNew()
+                        writeText(originalFilePath)
+                    }
+                }
+                Cache.PerFile(target, Kind.STATIC, absolutePath, libraryFileDirs.map { it.second },
+                        complete = cacheDirContents.containsAll(libraryFileDirs.map { it.second.absolutePath }))
             }
         }
     }

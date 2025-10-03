@@ -31,6 +31,7 @@ internal fun determineLinkerOutput(context: PhaseContext): LinkerOutputKind =
                 }
                 LinkerOutputKind.EXECUTABLE
             }
+            CompilerOutputKind.OBJECT -> LinkerOutputKind.NONE // When compiling object files, we are not interested into the linking phase.
             else -> TODO("${context.config.produce} should not reach native linker stage")
         }
 
@@ -134,6 +135,23 @@ internal class Linker(
         val linkerArgs = asLinkerArgs(config.configuration.getNotNull(KonanConfigKeys.LINKER_ARGS)) +
                 caches.dynamic +
                 libraryProvidedLinkerFlags + additionalLinkerArgs
+
+        if (config.produce == CompilerOutputKind.OBJECT) {
+            return buildList {
+                caches.static.filter { it.File().absolutePath.contains("objmode") }.forEach { arFile ->
+                    // So, we have a `.a` library file, we extract its content and rename it to the destination
+                    val originalSourceName = arFile.File().parentFile.parentFile.child("source").readStrings().first() + ".o"
+                    Command("ar").apply {
+                        +"x"
+                        +arFile
+                    }.let(::add)
+                    Command("mv").apply {
+                        +arFile
+                        +originalSourceName
+                    }.let(::add)
+                }
+            }
+        }
 
         return with(linker) {
             LinkerArguments(

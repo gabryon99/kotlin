@@ -15,6 +15,10 @@ internal data class ObjectFilesPhaseInput(
         val objectFile: File,
 )
 
+/**
+ * Compile the input LLVM bitcode file into an Object File containing assembly instructions of target architecture.
+ * The bitcode is compiled using `clang++`.
+ */
 internal val ObjectFilesPhase = createSimpleNamedCompilerPhase<PhaseContext, ObjectFilesPhaseInput>(
         name = "ObjectFiles",
 ) { context, input ->
