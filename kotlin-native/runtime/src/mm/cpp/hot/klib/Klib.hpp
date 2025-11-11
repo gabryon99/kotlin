@@ -33,8 +33,8 @@ public:
 
         KotlinFile(const std::string& file_name, const std::string& fq_name) : fileName(file_name), fqName(fq_name) {}
 
-        [[nodiscard]] std::string file_name() const { return fileName; }
-        [[nodiscard]] std::string fq_name() const { return fqName; }
+        [[nodiscard]] const std::string& file_name() const { return fileName; }
+        [[nodiscard]] const std::string& fq_name() const { return fqName; }
     };
 
     explicit Klib(const std::string& decompressedBasePath) {
