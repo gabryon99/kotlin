@@ -5,7 +5,6 @@
 #include <chrono>
 #include <fstream>
 #include <sstream>
-#include <charconv>
 
 #include <dlfcn.h>
 
@@ -23,13 +22,8 @@
 
 #include "hot/HotReloadServer.hpp"
 #include "hot/HotReloadUtility.hpp"
-#include "hot/LightClassTable.hpp"
 
-#if KONAN_APPLE
 #include "hot/fishhook.h"
-#endif
-
-#include "hot/ComposeIRAnalyzer.hpp"
 
 using namespace kotlin;
 
@@ -39,7 +33,7 @@ void stopTheWorld(GCHandle gcHandle, const char* reason) noexcept;
 void resumeTheWorld(GCHandle gcHandle) noexcept;
 } // namespace kotlin::gc
 
-ManuallyScoped<hot::HotReloader> globalDataInstance{};
+ManuallyScoped<HotReloader> globalDataInstance{};
 
 enum class Origin { Global, ShadowStack, ObjRef };
 
@@ -130,18 +124,17 @@ void Kotlin_native_internal_HotReload_perform(ObjHeader* obj) {
 
 HotReloader::HotReloader() {
     utility::initializeHotReloadLogs();
-    utility::log("Initializing HotReload module");
+    utility::log("Initializing HotReload module and server");
     if (_server.start()) {
-        _server.run([this](const std::vector<std::string>& artifactOutputs) {
-            const ReloadRequest req {artifactOutputs};
-            _requests.push_front(req);
-            utility::log("A reload request has arrived...", utility::LogLevel::DEBUG);
+        _server.run([this](const std::vector<std::string>& dylibPaths) {
+            utility::log("A new reload request has arrived, containing: ", utility::LogLevel::DEBUG);
+            for (auto& dylib : dylibPaths) utility::log("\t" + dylib, utility::LogLevel::DEBUG);
+            _requests.emplace_front(dylibPaths);
         });
     }
 }
 
 void HotReloader::InitModule() noexcept {
-    //google::protobuf::SetLogHandler(nullptr);
     globalDataInstance.construct();
 }
 
@@ -207,43 +200,6 @@ void HotReloader::interposeNewFunctionSymbols(const LightClassTable& newClassTab
     }
 }
 
-void HotReloader::invlidateGroupsWithKey(const LightClassTable& newClassTable, const ir::Klib& klib) {
-
-    // constexpr const char* INVALIDATE_GROUPS_WITH_KEYS_SYMB = "kfun:androidx.compose.runtime#invalidateGroupsWithKey(kotlin.Int){}";
-    // const auto invalidateSym = dlsym(RTLD_DEFAULT, INVALIDATE_GROUPS_WITH_KEYS_SYMB);
-    // if (invalidateSym == nullptr) {
-    //     utility::log("Could not find the invalidateGroupsWithKey function...", utility::LogLevel::ERR);
-    //     return;
-    // }
-    //const auto invalidateGroupsWithKey = reinterpret_cast<void (*)(int)>(invalidateSym);
-
-    std::vector<long> composeKeys{};
-    const auto composableSingletons = newClassTable.getKotlinClass("ComposableSingletons$AppKt");
-    if (composableSingletons.has_value()) {
-        auto properties = composableSingletons.value().get().properties();
-        for (const auto& [name, _] : properties) {
-            if (name.find("lambda") != std::string::npos) {
-                if (auto key = parseComposeGroupKeyFromSingletonLambda(name); key.has_value()) {
-                    composeKeys.push_back(key.value());
-                }
-            }
-        }
-    }
-
-    for (const auto key : composeKeys) {
-        utility::log("(ComposableSingleton) found compose group with key=" + std::to_string(key));
-        //invalidateGroupsWithKey(static_cast<int>(key));
-    }
-
-    auto composeGroups = findComposeGroups(klib);
-
-    // debug statement :)
-    for (const auto& group : composeGroups) {
-        utility::log("found compose group with key=" + std::to_string(group.groupKey) + ", func=" + group.functionName);
-        //invalidateGroupsWithKey(static_cast<int>(group.groupKey));
-    }
-
-}
 void HotReloader::performIfNeeded(ObjHeader* _) noexcept {
     if (_requests.empty()) {
         // utility::log("Cannot perform hot-reloading since there is no upcoming request", utility::LogLevel::DEBUG);
@@ -322,9 +278,6 @@ void HotReloader::performIfNeeded(ObjHeader* _) noexcept {
     /// At the moment, we can cheat for the purpose of science by interposing only the toString method
     /// kfun:Vector#toString(){}kotlin.String
     interposeNewFunctionSymbols(newClassTable);
-
-    // 6. Perform `Recomposer#invalidateGroupsWithKey` function for each compose group found
-    invlidateGroupsWithKey(newClassTable, klib);
 
     kotlin::gc::resumeTheWorld(gcHandle);
     _processing = false;
@@ -585,8 +538,7 @@ void HotReloader::SymbolLoader::loadLibraryFromPath(const std::string& fileName)
         return;
     }
 
-    const uint64_t epoch =
-            std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+    const uint64_t epoch = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
 
     const LibraryHandle newHandle{epoch, libraryHandle, fileName};
     utility::log("Loaded library from path: " + fileName, utility::LogLevel::DEBUG);
@@ -614,5 +566,6 @@ TypeInfo* HotReloader::SymbolLoader::lookForTypeInfo(const std::string& mangledC
         if (symbol != nullptr) return static_cast<TypeInfo*>(symbol);
         utility::log("dlerror: " + std::string{dlerror()}, utility::LogLevel::ERR);
     }
+
     return nullptr;
 }

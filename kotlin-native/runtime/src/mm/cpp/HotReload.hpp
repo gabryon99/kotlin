@@ -39,8 +39,8 @@ public:
 
     struct ReloadRequest {
         friend class HotReloader;
-        std::vector<std::string> artifactOutputs;
-        explicit ReloadRequest(const std::vector<std::string>& artifact_outputs) : artifactOutputs(artifact_outputs) {}
+        std::vector<std::string> dylibPathsToLoad;
+        explicit ReloadRequest(const std::vector<std::string>& dylibs) : dylibPathsToLoad(dylibs) {}
     };
 
     static HotReloader& Instance() noexcept;
