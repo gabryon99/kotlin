@@ -109,6 +109,8 @@ object BinaryOptions : BinaryOptionRegistry() {
     val stackProtector by option<StackProtectorMode>()
 
     val hotReload by booleanOption()
+
+    val hotReloadServerPort by stringOption()
 }
 
 open class BinaryOption<T : Any>(
